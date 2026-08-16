@@ -19,6 +19,7 @@
     --nas:#b577c9;
     --liq:#9aa5b1;
     --vow:#e0b84d;
+    --ink-mark:#f2efe6;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;background:var(--ink);color:var(--paper);
@@ -54,9 +55,10 @@
   .examples button{background:none;border:1px solid var(--line);color:var(--paper-dim);
     border-radius:20px;padding:5px 14px;font-size:12px;cursor:pointer;font-family:inherit;direction:ltr;}
   .examples button:hover{border-color:var(--gold);color:var(--gold);}
-  .output-panel{margin-top:20px;overflow-x:auto;background:var(--panel2);border:1px solid var(--line);
-    border-radius:8px;padding:24px;min-height:180px;display:flex;align-items:center;}
-  .output-panel svg{display:block;}
+  .output-panel{margin-top:20px;overflow-x:auto;background:#050505;border:1px solid var(--line);
+    border-radius:8px;padding:28px;min-height:180px;display:flex;align-items:center;
+    box-shadow:inset 0 0 40px rgba(0,0,0,.6);}
+  .output-panel svg{display:block;shape-rendering:geometricPrecision;}
   .note{font-size:12px;color:var(--paper-dim);margin-top:10px;line-height:1.8;}
   footer{margin-top:50px;font-size:11px;color:var(--paper-dim);text-align:center;line-height:1.9;}
   a{color:var(--gold);}
@@ -73,7 +75,10 @@
     <code>Sefta.sfdir</code>; vowel letterforms are drawn using the new
     unified featural design (three families: chevron / stem / circle).
     Syllables are split automatically per the official CLL §3.9 rule, and
-    blocks are built using the recursive split rule.
+    blocks are built using the recursive split rule. The rendered output
+    below is drawn as pale ink on a black ground, packed tightly into each
+    square with no internal divider lines, closer to the density of a
+    CJK character.
   </p>
 
   <h2>Letter chart (25 letters: 6 vowels + 19 consonants)</h2>
@@ -130,22 +135,26 @@ function ring(cx,cy,rOut,rIn){
 const CHEVRON = "M100,800 L500,0 L900,800 L762,750 L500,183 L238,750 Z";
 const DOT_MID = "M500,300 L600,400 L500,500 L400,400 Z";        // used in 'i' as-is / shifted for others
 const DOT_LOW = "M500,400 L600,500 L500,600 L400,500 Z";        // 'e' dot position (from original font)
-const STEM    = "M450,0 L550,0 L550,800 L450,800 Z";
-const BASEBAR = "M300,700 L700,700 L700,800 L300,800 Z";
 const RING_OUT = ring(500,400,300,200);
+// 'a' and 'y' are each drawn as a SINGLE closed outline (stem fused into a
+// full-width bar), not two overlapping shapes — this avoids the even-odd
+// fill rule punching a hole where the pieces used to overlap, and reads
+// as a solid inverted-T / cross with no internal gap.
+const A_STEM_T   = "M450,0 L550,0 L550,620 L850,620 L850,800 L150,800 L150,620 L450,620 Z";
+const Y_STEM_CROSS = "M450,0 L550,0 L550,320 L850,320 L850,480 L550,480 L550,800 L450,800 L450,480 L150,480 L150,320 L450,320 Z";
 
 const VOWEL_PATHS = {
   i: CHEVRON,
   e: CHEVRON + " " + DOT_LOW,
-  y: STEM + " " + DOT_MID,
-  a: STEM + " " + BASEBAR,
+  y: Y_STEM_CROSS,
+  a: A_STEM_T,
   u: RING_OUT,
   o: RING_OUT + " " + DOT_MID
 };
 
 const ALL_PATHS = Object.assign({}, CONSONANT_PATHS, VOWEL_PATHS);
 
-// ---------- families / orientation / color ----------
+// ---------- families / orientation / color (used by the reference chart only) ----------
 const FAMILY = {};
 const ORIENT = {}; // 'h' = claims top strip, 'v' = claims left strip
 const COLOR = {};
@@ -161,6 +170,9 @@ setFam(['l'], 'l', 'h', 'var(--liq)');
 setFam(['r'], 'r', 'v', 'var(--liq)');
 const VOWELS = ['a','e','i','o','u','y'];
 setFam(VOWELS, 'Vowel', null, 'var(--vow)');
+
+// ink used for the actual converted writing (monochrome, no family colors)
+const INK = 'var(--ink-mark)';
 
 const IPA = {a:'ɑ',e:'ɛ',i:'i',o:'ɔ',u:'u',y:'ə','.':'ʔ',"'":'h',
   m:'m',n:'n',l:'l',r:'r',k:'k',p:'p',t:'t',c:'ʃ',s:'s',f:'f',
@@ -241,25 +253,32 @@ function el(tag, attrs){
   return e;
 }
 
+// shrink a rect toward its center, giving each letter breathing room
+// now that we no longer draw ruling lines between them
+function insetRect(rect, marginRatio){
+  const mx = rect.w*marginRatio, my = rect.h*marginRatio;
+  return {x:rect.x+mx, y:rect.y+my, w:rect.w-2*mx, h:rect.h-2*my};
+}
+
 function drawLetterInto(group, letter, rect){
   const path = ALL_PATHS[letter];
   if(!path) return;
-  const sx = rect.w/1000, sy = rect.h/800;
-  const g = el('g', {transform:`translate(${rect.x},${rect.y}) scale(${sx},${sy})`});
-  const p = el('path', {d:path, fill: COLOR[letter]||'var(--paper)', 'fill-rule':'evenodd'});
+  const r = insetRect(rect, 0.025);
+  const sx = r.w/1000, sy = r.h/800;
+  const g = el('g', {transform:`translate(${r.x},${r.y}) scale(${sx},${sy})`});
+  // a matching stroke on the fill softens the hard right-angle joints
+  // of the underlying polygon paths, giving a calmer, more drawn look
+  const p = el('path', {d:path, fill: INK, 'fill-rule':'evenodd',
+    stroke: INK, 'stroke-width':7, 'stroke-linejoin':'round', 'stroke-linecap':'round'});
   g.appendChild(p);
   group.appendChild(g);
-  // divider rect
-  group.appendChild(el('rect', {x:rect.x,y:rect.y,width:rect.w,height:rect.h,
-    fill:'none', stroke:'#3a3f55', 'stroke-width':1.5}));
+  // (no divider / border strokes — letters are separated by whitespace only)
 }
 
 function buildSyllableBlock(syl, blockSize){
   const g = el('g', {});
   const rects = layoutSyllable(syl.split(''), {x:0,y:0,w:blockSize,h:blockSize});
   rects.forEach(r=> drawLetterInto(g, r.letter, r.rect));
-  g.appendChild(el('rect', {x:0,y:0,width:blockSize,height:blockSize,fill:'none',
-    stroke:'#565c78','stroke-width':2}));
   return g;
 }
 
@@ -269,15 +288,15 @@ function render(){
   while(svg.firstChild) svg.removeChild(svg.firstChild);
   if(!text){ svg.setAttribute('viewBox','0 0 10 10'); return; }
 
-  const BLOCK = 120, GAP_WORD = 26, DOT_R = 5, PAD = 20;
+  const BLOCK = 120, SYL_GAP = 6, GAP_WORD = 20, DOT_R = 5, PAD = 20;
   let cursorX = PAD, cursorY = PAD;
   const rootG = el('g', {});
   const tokens = text.split(/\s+/).filter(Boolean);
 
   tokens.forEach((tok, ti)=>{
     if(tok === '.'){
-      // utterance end: filled square
-      const sq = el('rect', {x:cursorX, y: PAD + BLOCK/2 - 9, width:18, height:18, fill:'var(--gold)'});
+      // utterance end: filled square, drawn in the same ink
+      const sq = el('rect', {x:cursorX, y: PAD + BLOCK/2 - 9, width:18, height:18, fill: INK});
       rootG.appendChild(sq);
       cursorX += 18 + GAP_WORD;
       return;
@@ -285,18 +304,18 @@ function render(){
     const syls = syllabify(tok.toLowerCase());
     const wordG = el('g', {transform:`translate(${cursorX},${cursorY})`});
     let wx = 0;
-    syls.forEach(syl=>{
+    syls.forEach((syl, si)=>{
       const bg = buildSyllableBlock(syl, BLOCK);
       bg.setAttribute('transform', `translate(${wx},0)`);
       wordG.appendChild(bg);
-      wx += BLOCK;
+      wx += BLOCK + (si < syls.length-1 ? SYL_GAP : 0);
     });
     rootG.appendChild(wordG);
     cursorX += wx;
     // interpunct if next token isn't a period and isn't the last token
     const next = tokens[ti+1];
     if(next !== undefined && next !== '.'){
-      const dot = el('circle', {cx:cursorX + GAP_WORD/2, cy: PAD + BLOCK/2, r:DOT_R, fill:'var(--paper-dim)'});
+      const dot = el('circle', {cx:cursorX + GAP_WORD/2, cy: PAD + BLOCK/2, r:DOT_R, fill: INK});
       rootG.appendChild(dot);
     }
     cursorX += GAP_WORD;
@@ -310,7 +329,7 @@ function render(){
   svg.appendChild(rootG);
 }
 
-// ---------- letter chart ----------
+// ---------- letter chart (kept in color, as a family reference) ----------
 function buildChart(){
   const chart = document.getElementById('chart');
   const order = ['a','e','i','o','u','y','.',"'",'m','n','l','r','k','p','t','c','s','f','x','v','j','z','b','d','g'];
