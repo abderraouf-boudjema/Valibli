@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Valbli — Latin-to-Valbli Converter</title>
+<style>
+  :root{
+    --ink:#12141c;
+    --panel:#1b1e2a;
+    --panel2:#20242f;
+    --line:#333850;
+    --paper:#e9e6dd;
+    --paper-dim:#9aa0b4;
+    --gold:#c9a15b;
+    --stop:#cb6e3f;
+    --sib:#4fa98c;
+    --fric:#6c8fc7;
+    --nas:#b577c9;
+    --liq:#9aa5b1;
+    --vow:#e0b84d;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--ink);color:var(--paper);
+    font-family:"Segoe UI",Tahoma,Helvetica,Arial,sans-serif;}
+  body{padding:28px 20px 80px;}
+  .wrap{max-width:1080px;margin:0 auto;}
+  h1{font-size:28px;margin:0 0 4px;font-weight:700;letter-spacing:.5px;}
+  h1 .lat{font-family:Georgia,"Times New Roman",serif;font-style:italic;color:var(--gold);}
+  .subtitle{color:var(--paper-dim);font-size:14px;margin:0 0 28px;line-height:1.9;}
+  h2{font-size:18px;border-inline-start:4px solid var(--gold);padding-inline-start:10px;
+     margin:40px 0 14px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;}
+
+  /* ---- letter chart ---- */
+  .legend{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:18px;font-size:12px;color:var(--paper-dim)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .swatch{width:11px;height:11px;border-radius:3px;display:inline-block}
+  .chart{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:10px;}
+  .letter-tile{background:var(--panel2);border:1px solid var(--line);border-radius:8px;
+    padding:8px 6px 10px;text-align:center;}
+  .letter-tile svg{width:100%;height:56px;display:block;margin-bottom:6px;}
+  .letter-tile .lat{font-family:Georgia,serif;font-size:18px;font-weight:700;color:var(--paper);
+     direction:ltr;}
+  .letter-tile .ipa{font-size:10px;color:var(--paper-dim);direction:ltr;}
+
+  /* ---- converter ---- */
+  textarea{width:100%;min-height:70px;background:var(--panel2);color:var(--paper);
+    border:1px solid var(--line);border-radius:8px;padding:12px;font-size:16px;
+    font-family:"JetBrains Mono","Courier New",monospace;direction:ltr;text-align:left;
+    resize:vertical;}
+  textarea:focus{outline:2px solid var(--gold);}
+  .examples{margin:10px 0 0;display:flex;gap:8px;flex-wrap:wrap;}
+  .examples button{background:none;border:1px solid var(--line);color:var(--paper-dim);
+    border-radius:20px;padding:5px 14px;font-size:12px;cursor:pointer;font-family:inherit;direction:ltr;}
+  .examples button:hover{border-color:var(--gold);color:var(--gold);}
+  .output-panel{margin-top:20px;overflow-x:auto;background:var(--panel2);border:1px solid var(--line);
+    border-radius:8px;padding:24px;min-height:180px;display:flex;align-items:center;}
+  .output-panel svg{display:block;}
+  .note{font-size:12px;color:var(--paper-dim);margin-top:10px;line-height:1.8;}
+  footer{margin-top:50px;font-size:11px;color:var(--paper-dim);text-align:center;line-height:1.9;}
+  a{color:var(--gold);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1><span class="lat">Valbli</span> — Latin-to-Block Converter</h1>
+  <p class="subtitle">
+    An interactive tool that converts Lojban text written in the Latin
+    alphabet into the <em>Valbli</em> block writing system. Consonant
+    letterforms are extracted from the original font source
+    <code>Sefta.sfdir</code>; vowel letterforms are drawn using the new
+    unified featural design (three families: chevron / stem / circle).
+    Syllables are split automatically per the official CLL §3.9 rule, and
+    blocks are built using the recursive split rule.
+  </p>
+
+  <h2>Letter chart (25 letters: 6 vowels + 19 consonants)</h2>
+  <div class="card">
+    <div class="legend">
+      <span><i class="swatch" style="background:var(--vow)"></i> Vowels</span>
+      <span><i class="swatch" style="background:var(--stop)"></i> Stops</span>
+      <span><i class="swatch" style="background:var(--sib)"></i> Sibilants</span>
+      <span><i class="swatch" style="background:var(--fric)"></i> Fricatives</span>
+      <span><i class="swatch" style="background:var(--nas)"></i> Nasals</span>
+      <span><i class="swatch" style="background:var(--liq)"></i> l / r</span>
+    </div>
+    <div id="chart" class="chart"></div>
+  </div>
+
+  <h2>Converter</h2>
+  <div class="card">
+    <textarea id="input" spellcheck="false">mi tavla do .</textarea>
+    <div class="examples">
+      <button data-ex="mi tavla do .">mi tavla do .</button>
+      <button data-ex="sutra .">sutra .</button>
+      <button data-ex="coi ro do .">coi ro do .</button>
+      <button data-ex="mi patfu do .">mi patfu do .</button>
+      <button data-ex="ti pa cukta .">ti pa cukta .</button>
+    </div>
+    <div class="output-panel"><svg id="output"></svg></div>
+    <p class="note">
+      Type Lojban words in lowercase Latin letters, separated by spaces. Use
+      a standalone "." (preceded by a space) to mark the end of an utterance
+      (the filled square). Each word is automatically separated from the
+      next by a small word-boundary dot. The horizontal left-to-right layout
+      here is a practical demo choice only — the official writing direction
+      is still undecided (see the Backlog section in README.md).
+    </p>
+  </div>
+
+  <footer>
+    Built on top of the original
+    <span style="display:inline-block">valbli-master</span>
+    project, extended with this design session's decisions (vowels, block
+    template, syllabification, lujvo, punctuation, and handwriting
+    guidance).
+  </footer>
+</div>
+
+<script>
+const CONSONANT_PATHS = {".": "M 900.0 450.0 L 136.0 450.0 L 100.0 350.0 L 864.0 350.0 L 900.0 450.0 Z", "'": "M 480.0 0.0 L 520.0 0.0 L 520.0 800.0 L 480.0 800.0 Z", "m": "M 478.0 218.0 C 459.0 258.0 439.0 295.0 439.0 330.0 C 439.0 357.0 450.0 384.0 482.0 410.0 C 499.0 424.0 519.0 429.0 540.0 429.0 C 631.0 429.0 748.0 333.0 748.0 332.0 C 749.0 332.0 752.0 438.0 752.0 438.0 C 752.0 438.0 622.0 526.0 509.0 526.0 C 474.0 526.0 440.0 517.0 412.0 494.0 C 362.0 452.0 346.0 398.0 346.0 344.0 C 346.0 245.0 403.0 150.0 404.0 150.0 C 406.0 150.0 478.0 218.0 478.0 218.0 M 864.0 700.0 L 900.0 800.0 L 136.0 800.0 L 100.0 700.0 L 100.0 36.0 L 200.0 0.0 L 200.0 700.0 L 864.0 700.0 Z", "n": "M 500.0 136.0 L 600.0 100.0 L 600.0 700.0 L 864.0 700.0 L 900.0 800.0 L 136.0 800.0 L 100.0 700.0 L 100.0 36.0 L 200.0 0.0 L 200.0 700.0 L 500.0 700.0 L 500.0 136.0 Z", "l": "M 141.0 731.0 L 819.0 341.0 L 900.0 410.0 L 222.0 800.0 L 141.0 731.0 M 100.0 426.0 L 838.0 0.0 L 919.0 69.0 L 181.0 495.0 L 100.0 426.0 Z", "r": "M 644.0 179.0 L 740.0 224.0 L 200.0 764.0 L 100.0 800.0 L 100.0 36.0 L 200.0 0.0 L 200.0 623.0 L 644.0 179.0 Z", "k": "M 215.0 800.0 L 95.0 800.0 L 499.0 100.0 L 136.0 100.0 L 100.0 0.0 L 864.0 0.0 L 900.0 100.0 L 620.0 100.0 L 215.0 800.0 Z", "p": "M 136.0 100.0 L 100.0 0.0 L 864.0 0.0 L 900.0 100.0 C 932.0 175.0 951.0 278.0 951.0 382.0 C 951.0 581.0 881.0 780.0 702.0 780.0 C 701.0 780.0 701.0 780.0 700.0 780.0 C 424.0 778.0 400.0 273.0 400.0 255.0 L 500.0 200.0 C 500.0 200.0 530.0 719.0 700.0 723.0 C 701.0 723.0 702.0 723.0 703.0 723.0 C 813.0 723.0 850.0 541.0 850.0 373.0 C 850.0 241.0 827.0 117.0 800.0 100.0 L 136.0 100.0 Z", "t": "M 550.0 100.0 L 550.0 762.0 L 450.0 798.0 L 450.0 100.0 L 136.0 100.0 L 100.0 0.0 L 864.0 0.0 L 900.0 100.0 L 550.0 100.0 Z", "c": "M 900.0 100.0 L 900.0 450.0 L 200.0 450.0 L 200.0 800.0 L 136.0 800.0 L 100.0 700.0 L 100.0 350.0 L 800.0 350.0 L 800.0 98.0 L 136.0 100.0 L 100.0 0.0 L 864.0 0.0 L 900.0 100.0 Z", "s": "M 900.0 100.0 L 900.0 800.0 L 136.0 800.0 L 100.0 700.0 L 800.0 700.0 L 800.0 98.0 L 136.0 100.0 L 100.0 0.0 L 864.0 0.0 L 900.0 100.0 Z", "f": "M 200.0 36.0 L 200.0 649.0 C 217.0 676.0 321.0 699.0 432.0 699.0 C 572.0 699.0 723.0 662.0 723.0 552.0 C 723.0 551.0 723.0 550.0 723.0 549.0 C 719.0 379.0 300.0 349.0 300.0 349.0 L 355.0 249.0 C 373.0 249.0 778.0 273.0 780.0 549.0 C 780.0 550.0 780.0 551.0 780.0 551.0 C 780.0 731.0 624.0 800.0 455.0 800.0 C 367.0 800.0 275.0 781.0 200.0 749.0 L 100.0 713.0 L 100.0 0.0 L 200.0 36.0 Z", "x": "M 800.0 685.0 L 800.0 805.0 L 200.0 401.0 L 200.0 764.0 L 100.0 800.0 L 100.0 36.0 L 200.0 0.0 L 200.0 280.0 L 800.0 685.0 Z", "v": "M 200.0 200.0 L 200.0 649.0 C 217.0 676.0 321.0 699.0 432.0 699.0 C 572.0 699.0 723.0 662.0 723.0 552.0 C 723.0 551.0 723.0 550.0 723.0 549.0 C 719.0 379.0 300.0 349.0 300.0 349.0 L 355.0 249.0 C 373.0 249.0 778.0 273.0 780.0 549.0 C 780.0 550.0 780.0 551.0 780.0 551.0 C 780.0 731.0 624.0 800.0 455.0 800.0 C 367.0 800.0 275.0 781.0 200.0 749.0 L 100.0 713.0 L 100.0 0.0 L 200.0 36.0 L 200.0 100.0 L 752.0 100.0 L 788.0 200.0 L 200.0 200.0 Z", "j": "M 900.0 100.0 L 900.0 450.0 L 200.0 450.0 L 200.0 700.0 L 864.0 700.0 L 900.0 800.0 L 136.0 800.0 L 100.0 700.0 L 100.0 350.0 L 800.0 350.0 L 800.0 98.0 L 136.0 100.0 L 100.0 0.0 L 864.0 0.0 L 900.0 100.0 Z", "z": "M 900.0 800.0 L 136.0 800.0 L 100.0 700.0 L 864.0 700.0 L 900.0 800.0 M 900.0 100.0 L 900.0 450.0 L 136.0 450.0 L 100.0 350.0 L 800.0 350.0 L 800.0 98.0 L 136.0 100.0 L 100.0 0.0 L 864.0 0.0 L 900.0 100.0 Z", "b": "M 300.0 764.0 L 200.0 800.0 L 200.0 100.0 L 136.0 100.0 L 100.0 0.0 L 864.0 0.0 L 900.0 100.0 C 932.0 175.0 951.0 278.0 951.0 382.0 C 951.0 581.0 881.0 780.0 702.0 780.0 C 701.0 780.0 701.0 780.0 700.0 780.0 C 424.0 778.0 400.0 273.0 400.0 255.0 L 500.0 200.0 C 500.0 200.0 530.0 719.0 700.0 723.0 C 701.0 723.0 702.0 723.0 703.0 723.0 C 813.0 723.0 850.0 541.0 850.0 373.0 C 850.0 241.0 827.0 117.0 800.0 100.0 L 300.0 100.0 L 300.0 764.0 Z", "d": "M 300.0 764.0 L 200.0 800.0 L 200.0 100.0 L 136.0 100.0 L 100.0 0.0 L 864.0 0.0 L 900.0 100.0 L 550.0 100.0 L 550.0 762.0 L 450.0 798.0 L 450.0 100.0 L 300.0 100.0 L 300.0 764.0 Z", "g": "M 200.0 100.0 L 136.0 100.0 L 100.0 0.0 L 864.0 0.0 L 900.0 100.0 L 620.0 100.0 L 215.0 800.0 L 95.0 800.0 L 200.0 644.0 L 200.0 100.0 M 300.0 496.0 L 499.0 100.0 L 300.0 100.0 L 300.0 496.0 Z"};
+
+// ---------- vowel paths (new unified featural design) ----------
+function ring(cx,cy,rOut,rIn){
+  return `M ${cx-rOut} ${cy} A ${rOut} ${rOut} 0 1 0 ${cx+rOut} ${cy} A ${rOut} ${rOut} 0 1 0 ${cx-rOut} ${cy} Z `+
+         `M ${cx-rIn} ${cy} A ${rIn} ${rIn} 0 1 1 ${cx+rIn} ${cy} A ${rIn} ${rIn} 0 1 1 ${cx-rIn} ${cy} Z`;
+}
+const CHEVRON = "M100,800 L500,0 L900,800 L762,750 L500,183 L238,750 Z";
+const DOT_MID = "M500,300 L600,400 L500,500 L400,400 Z";        // used in 'i' as-is / shifted for others
+const DOT_LOW = "M500,400 L600,500 L500,600 L400,500 Z";        // 'e' dot position (from original font)
+const STEM    = "M450,0 L550,0 L550,800 L450,800 Z";
+const BASEBAR = "M300,700 L700,700 L700,800 L300,800 Z";
+const RING_OUT = ring(500,400,300,200);
+
+const VOWEL_PATHS = {
+  i: CHEVRON,
+  e: CHEVRON + " " + DOT_LOW,
+  y: STEM + " " + DOT_MID,
+  a: STEM + " " + BASEBAR,
+  u: RING_OUT,
+  o: RING_OUT + " " + DOT_MID
+};
+
+const ALL_PATHS = Object.assign({}, CONSONANT_PATHS, VOWEL_PATHS);
+
+// ---------- families / orientation / color ----------
+const FAMILY = {};
+const ORIENT = {}; // 'h' = claims top strip, 'v' = claims left strip
+const COLOR = {};
+
+function setFam(letters, fam, orient, color){
+  letters.forEach(l=>{FAMILY[l]=fam; ORIENT[l]=orient; COLOR[l]=color;});
+}
+setFam(['.', 'b','d','g','k','p','t'], 'Stops', 'h', 'var(--stop)');
+setFam(['c','j','s','z'], 'Sibilants', 'v', 'var(--sib)');
+setFam(["'",'f','v','x'], 'Fricatives', 'v', 'var(--fric)');
+setFam(['m','n'], 'Nasals', 'h', 'var(--nas)');
+setFam(['l'], 'l', 'h', 'var(--liq)');
+setFam(['r'], 'r', 'v', 'var(--liq)');
+const VOWELS = ['a','e','i','o','u','y'];
+setFam(VOWELS, 'Vowel', null, 'var(--vow)');
+
+const IPA = {a:'ɑ',e:'ɛ',i:'i',o:'ɔ',u:'u',y:'ə','.':'ʔ',"'":'h',
+  m:'m',n:'n',l:'l',r:'r',k:'k',p:'p',t:'t',c:'ʃ',s:'s',f:'f',
+  x:'x',v:'v',j:'ʒ',z:'z',b:'b',d:'d',g:'g'};
+
+// ---------- syllabification (CLL 3.9) ----------
+const VALID_PAIRS = new Set(("bl br cf ck cl cm cn cp cr ct dj dr dz fl fr gl gr "+
+  "jb jd jg jm jv kl kr ml mr pl pr sf sk sl sm sn sp sr st tc tr ts vl vr xl xr "+
+  "zb zd zg zm zv").split(' '));
+
+function isVowel(ch){ return VOWELS.includes(ch); }
+
+function syllabify(word){
+  const chars = word.split('');
+  const vpos = [];
+  chars.forEach((c,i)=>{ if(isVowel(c)) vpos.push(i); });
+  if(vpos.length===0) return [word]; // degenerate
+  const boundaries = [0]; // syllable start indices
+  for(let k=0;k<vpos.length-1;k++){
+    const vi = vpos[k], vj = vpos[k+1];
+    const cluster = word.slice(vi+1, vj);
+    let cut;
+    if(cluster.length===0){ cut = vj; }
+    else if(cluster.length===1){ cut = vi+1; }
+    else if(cluster.length===2){
+      cut = VALID_PAIRS.has(cluster) ? vi+1 : vi+2;
+    } else {
+      // 3+ consonants: boundary after the first consonant
+      cut = vi+2;
+    }
+    boundaries.push(cut);
+  }
+  boundaries.push(word.length);
+  const syls = [];
+  for(let k=0;k<boundaries.length-1;k++){
+    syls.push(word.slice(boundaries[k], boundaries[k+1]));
+  }
+  return syls;
+}
+
+// ---------- recursive block layout (section 2) ----------
+function layoutSyllable(letters, rect){
+  const out = [];
+  let cur = {...rect};
+  let prevAxis = null;
+  for(let i=0;i<letters.length;i++){
+    const L = letters[i];
+    const isLast = i===letters.length-1;
+    if(isLast){
+      out.push({letter:L, rect:{...cur}});
+      break;
+    }
+    let axis;
+    if(isVowel(L)){
+      axis = (prevAxis==='h') ? 'v' : 'h';
+    } else {
+      axis = ORIENT[L] || 'h';
+    }
+    if(axis==='h'){
+      const stripH = cur.h*0.5;
+      out.push({letter:L, rect:{x:cur.x,y:cur.y,w:cur.w,h:stripH}});
+      cur = {x:cur.x, y:cur.y+stripH, w:cur.w, h:cur.h-stripH};
+    } else {
+      const stripW = cur.w*0.5;
+      out.push({letter:L, rect:{x:cur.x,y:cur.y,w:stripW,h:cur.h}});
+      cur = {x:cur.x+stripW, y:cur.y, w:cur.w-stripW, h:cur.h};
+    }
+    prevAxis = axis;
+  }
+  return out;
+}
+
+// ---------- SVG helpers ----------
+const SVGNS = "http://www.w3.org/2000/svg";
+function el(tag, attrs){
+  const e = document.createElementNS(SVGNS, tag);
+  for(const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+
+function drawLetterInto(group, letter, rect){
+  const path = ALL_PATHS[letter];
+  if(!path) return;
+  const sx = rect.w/1000, sy = rect.h/800;
+  const g = el('g', {transform:`translate(${rect.x},${rect.y}) scale(${sx},${sy})`});
+  const p = el('path', {d:path, fill: COLOR[letter]||'var(--paper)', 'fill-rule':'evenodd'});
+  g.appendChild(p);
+  group.appendChild(g);
+  // divider rect
+  group.appendChild(el('rect', {x:rect.x,y:rect.y,width:rect.w,height:rect.h,
+    fill:'none', stroke:'#3a3f55', 'stroke-width':1.5}));
+}
+
+function buildSyllableBlock(syl, blockSize){
+  const g = el('g', {});
+  const rects = layoutSyllable(syl.split(''), {x:0,y:0,w:blockSize,h:blockSize});
+  rects.forEach(r=> drawLetterInto(g, r.letter, r.rect));
+  g.appendChild(el('rect', {x:0,y:0,width:blockSize,height:blockSize,fill:'none',
+    stroke:'#565c78','stroke-width':2}));
+  return g;
+}
+
+function render(){
+  const text = document.getElementById('input').value.trim();
+  const svg = document.getElementById('output');
+  while(svg.firstChild) svg.removeChild(svg.firstChild);
+  if(!text){ svg.setAttribute('viewBox','0 0 10 10'); return; }
+
+  const BLOCK = 120, GAP_WORD = 26, DOT_R = 5, PAD = 20;
+  let cursorX = PAD, cursorY = PAD;
+  const rootG = el('g', {});
+  const tokens = text.split(/\s+/).filter(Boolean);
+
+  tokens.forEach((tok, ti)=>{
+    if(tok === '.'){
+      // utterance end: filled square
+      const sq = el('rect', {x:cursorX, y: PAD + BLOCK/2 - 9, width:18, height:18, fill:'var(--gold)'});
+      rootG.appendChild(sq);
+      cursorX += 18 + GAP_WORD;
+      return;
+    }
+    const syls = syllabify(tok.toLowerCase());
+    const wordG = el('g', {transform:`translate(${cursorX},${cursorY})`});
+    let wx = 0;
+    syls.forEach(syl=>{
+      const bg = buildSyllableBlock(syl, BLOCK);
+      bg.setAttribute('transform', `translate(${wx},0)`);
+      wordG.appendChild(bg);
+      wx += BLOCK;
+    });
+    rootG.appendChild(wordG);
+    cursorX += wx;
+    // interpunct if next token isn't a period and isn't the last token
+    const next = tokens[ti+1];
+    if(next !== undefined && next !== '.'){
+      const dot = el('circle', {cx:cursorX + GAP_WORD/2, cy: PAD + BLOCK/2, r:DOT_R, fill:'var(--paper-dim)'});
+      rootG.appendChild(dot);
+    }
+    cursorX += GAP_WORD;
+  });
+
+  const totalW = cursorX + PAD;
+  const totalH = BLOCK + PAD*2;
+  svg.setAttribute('viewBox', `0 0 ${totalW} ${totalH}`);
+  svg.setAttribute('width', Math.min(totalW, 900));
+  svg.setAttribute('height', totalH);
+  svg.appendChild(rootG);
+}
+
+// ---------- letter chart ----------
+function buildChart(){
+  const chart = document.getElementById('chart');
+  const order = ['a','e','i','o','u','y','.',"'",'m','n','l','r','k','p','t','c','s','f','x','v','j','z','b','d','g'];
+  order.forEach(L=>{
+    const tile = document.createElement('div');
+    tile.className = 'letter-tile';
+    const svg = document.createElementNS(SVGNS,'svg');
+    svg.setAttribute('viewBox','0 0 1000 800');
+    const path = el('path', {d:ALL_PATHS[L], fill: COLOR[L], 'fill-rule':'evenodd'});
+    svg.appendChild(path);
+    tile.appendChild(svg);
+    const lat = document.createElement('div'); lat.className='lat'; lat.textContent = L;
+    const ipa = document.createElement('div'); ipa.className='ipa'; ipa.textContent = 'IPA: '+IPA[L];
+    tile.appendChild(lat); tile.appendChild(ipa);
+    chart.appendChild(tile);
+  });
+}
+
+document.getElementById('input').addEventListener('input', render);
+document.querySelectorAll('.examples button').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    document.getElementById('input').value = b.dataset.ex;
+    render();
+  });
+});
+
+buildChart();
+render();
+</script>
+</body>
+</html>
